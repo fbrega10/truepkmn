@@ -2,8 +2,11 @@ use crate::errors::errors::PokeError;
 use actix_web::web::Json;
 use reqwest::{self, blocking::Client, StatusCode};
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 
 const ENGLISH_LANGUAGE: &str = "en";
+const YODA_URL: &str = "https://api.funtranslations.com/translate/yoda.json";
+const SHAKESPEARE_URL: &str = "https://api.funtranslations.com/translate/shakespeare.json";
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PokemonDto {
@@ -30,6 +33,9 @@ impl PokemonDto {
             habitat,
             is_legendary,
         }
+    }
+    pub fn set_description(&mut self, description: String) {
+        self.description = description
     }
 }
 
@@ -72,6 +78,17 @@ pub struct SpeciesResponse {
     pub flavor_text_entries: Vec<Flavor>,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Translation {
+    #[serde(rename = "contents")]
+    pub contents: Contents,
+}
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Contents {
+    #[serde(rename = "translated")]
+    pub translated: String,
+}
+
 //service to be implemented
 pub trait PokemonRetriever {
     fn catch_pokemon(&self) -> PokemonDto;
@@ -111,7 +128,7 @@ impl PokemonService {
                 }
                 let species = res
                     .json::<SpeciesResponse>()
-                    .expect("error reading the json Pokemon Species response");
+                    .expect("error parsing the json Pokemon Species response");
                 let habitat: String = (&species.habitat.name)
                     .chars()
                     .filter(|c| *c != '\\' && *c != '"')
@@ -126,13 +143,16 @@ impl PokemonService {
                     .map(|c| c.flavor_text)
                     .last()
                     .expect("error extracting habitat from json pokeapi response")
-                    .replace("\n", "");
-                let pokemon: PokemonDto =
+                    .replace("\n", " ");
+                let mut pokemon: PokemonDto =
                     PokemonDto::new(name.clone(), description, habitat, is_legendary);
                 println!("{:?}", pokemon);
                 match self.pokemon_type {
-                    PokemonType::BASIC => Ok(actix_web::web::Json(pokemon)),
-                    PokemonType::TRANSLATED => Ok(actix_web::web::Json(pokemon)),
+                    PokemonType::BASIC => Ok(Json(pokemon)),
+                    PokemonType::TRANSLATED => {
+                        translate_pokemon(&mut pokemon);
+                        Ok(Json(pokemon))
+                    }
                 }
             }
             Err(err) => {
@@ -145,6 +165,31 @@ impl PokemonService {
     }
 }
 
-pub fn translate_pokemon(dto: PokemonDto) -> PokemonDto{
-
+pub fn translate_pokemon(dto: &mut PokemonDto) {
+    //call to the funapitranslations server and get the formatted description
+    let url = if dto.habitat.to_string() == "cave".to_string() || dto.is_legendary {
+        YODA_URL
+    } else {
+        SHAKESPEARE_URL
+    };
+    let client = Client::new();
+    let content = dto.description.clone().replace(" ", "%20");
+    let params = ("text", content.as_str());
+    println!("{:?}", &params);
+    match client.get(url).query(&[params]).send() {
+        Ok(t) => {
+            println!("{:?}", t);
+            match t.status() {
+                StatusCode::OK => dto.set_description(
+                    t.json::<Translation>()
+                        .expect("error parsing the json response from shakespeare")
+                        .contents
+                        .translated,
+                ),
+                status => println!("invalid status code, server responded with : {}", status),
+            }
+        }
+        //TODO: log error here
+        Err(e) => println!("error calling yoda API?{}", e),
+    }
 }

@@ -20,14 +20,23 @@ async fn get_pokemon(name: web::Path<String>) -> HttpResponse {
 
 #[get("/api/v1/pokemon/{name}/translated")]
 async fn get_translated_pokemon(name: web::Path<String>) -> HttpResponse {
-    HttpResponse::Ok().finish()
+    let pk = PokemonService::new(name.to_string(), PokemonType::TRANSLATED);
+    let handle: JoinHandle<Result<Json<PokemonDto>, PokeError>> =
+        tokio::task::spawn_blocking(move || pk.catch_pokemon());
+    match handle.await.unwrap() {
+        Ok(t) => HttpResponse::Ok().json(t),
+        Err(e) => e.error_response(),
+    }
 }
 
 #[actix_web::main] // or #[tokio::main]
 async fn main() -> std::io::Result<()> {
-    HttpServer::new(|| App::new().service(get_pokemon))
-        .service(get_translated_pokemon)
-        .bind(("127.0.0.1", 8080))?
-        .run()
-        .await
+    HttpServer::new(|| {
+        App::new()
+            .service(get_pokemon)
+            .service(get_translated_pokemon)
+    })
+    .bind(("127.0.0.1", 8080))?
+    .run()
+    .await
 }
