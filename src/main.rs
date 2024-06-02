@@ -4,7 +4,7 @@ mod models;
 use crate::errors::errors::PokeError;
 use crate::models::pokemon::{PokemonDto, PokemonService, PokemonType};
 use actix_web::web::Json;
-use actix_web::{get, web, App, HttpResponse, HttpServer, ResponseError};
+use actix_web::{get, middleware::Logger, web, App, HttpResponse, HttpServer, ResponseError};
 use tokio::task::JoinHandle;
 
 #[get("/api/v1/pokemon/{name}")]
@@ -31,10 +31,12 @@ async fn get_translated_pokemon(name: web::Path<String>) -> HttpResponse {
 
 #[actix_web::main] // or #[tokio::main]
 async fn main() -> std::io::Result<()> {
+    env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
     HttpServer::new(|| {
         App::new()
             .service(get_pokemon)
             .service(get_translated_pokemon)
+            .wrap(Logger::new("%a %{User-Agent}i"))
     })
     .bind(("127.0.0.1", 8080))?
     .run()

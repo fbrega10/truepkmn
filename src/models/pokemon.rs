@@ -1,5 +1,6 @@
 use crate::errors::errors::PokeError;
 use actix_web::web::Json;
+use log::{debug, error, info, log_enabled, Level};
 use reqwest::{self, blocking::Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
@@ -7,6 +8,7 @@ use std::fmt::Debug;
 const ENGLISH_LANGUAGE: &str = "en";
 const YODA_URL: &str = "https://api.funtranslations.com/translate/yoda.json";
 const SHAKESPEARE_URL: &str = "https://api.funtranslations.com/translate/shakespeare.json";
+const POKE_NOT_FOUND: &str = "Error: pokemon not found!";
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PokemonDto {
@@ -117,7 +119,8 @@ impl PokemonService {
             Ok(res) => {
                 match res.status() {
                     StatusCode::NOT_FOUND => {
-                        return Err(PokeError::NotFound("pokemon not found".to_string()))
+                        error!("{}", POKE_NOT_FOUND);
+                        return Err(PokeError::NotFound("pokemon not found".to_string()));
                     }
                     StatusCode::OK => (),
                     _ => {
@@ -133,7 +136,7 @@ impl PokemonService {
                     .chars()
                     .filter(|c| *c != '\\' && *c != '"')
                     .collect();
-                println!("habitat : {}", habitat);
+                info!("current pokemon habitat : {}", habitat);
                 let is_legendary: bool = *&species.is_legendary;
                 let name = &species.name;
                 let description: String = species
@@ -146,7 +149,6 @@ impl PokemonService {
                     .replace("\n", " ");
                 let mut pokemon: PokemonDto =
                     PokemonDto::new(name.clone(), description, habitat, is_legendary);
-                println!("{:?}", pokemon);
                 match self.pokemon_type {
                     PokemonType::BASIC => Ok(Json(pokemon)),
                     PokemonType::TRANSLATED => {
@@ -156,7 +158,7 @@ impl PokemonService {
                 }
             }
             Err(err) => {
-                println!("error occurred calling pokeapi.co :  {}", err);
+                error!("error occurred calling pokeapi.co : {}", err);
                 Err(PokeError::ServiceUnavailable(
                     "pokeapi.co is currently unavailable ".to_string(),
                 ))
@@ -167,29 +169,37 @@ impl PokemonService {
 
 pub fn translate_pokemon(dto: &mut PokemonDto) {
     //call to the funapitranslations server and get the formatted description
+    //using a reference to modify (no copying in memory) the pokemonDto value
+    info!("pokemon dto to be translated : {:?}", dto);
     let url = if dto.habitat.to_string() == "cave".to_string() || dto.is_legendary {
+        info!("YODA url selected!");
         YODA_URL
     } else {
+        info!("SHAKESPEARE url selected!");
         SHAKESPEARE_URL
     };
     let client = Client::new();
-    let content = dto.description.clone().replace(" ", "%20");
+    let content = String::from(&dto.description);
     let params = ("text", content.as_str());
-    println!("{:?}", &params);
+    info!(
+        "query params used in the translation server call {:?}",
+        &params
+    );
     match client.get(url).query(&[params]).send() {
         Ok(t) => {
             println!("{:?}", t);
             match t.status() {
-                StatusCode::OK => dto.set_description(
-                    t.json::<Translation>()
+                StatusCode::OK => {
+                    let response = t
+                        .json::<Translation>()
                         .expect("error parsing the json response from shakespeare")
                         .contents
-                        .translated,
-                ),
-                status => println!("invalid status code, server responded with : {}", status),
+                        .translated;
+                    dto.set_description(response);
+                }
+                status => error!("invalid status code, server responded with : {}", status),
             }
         }
-        //TODO: log error here
-        Err(e) => println!("error calling yoda API?{}", e),
+        Err(e) => error!("error calling the translation API? {}", e),
     }
 }
