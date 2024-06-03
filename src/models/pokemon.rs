@@ -4,6 +4,7 @@ use log::{error, info};
 use reqwest::{self, blocking::Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
+use std::time::Duration;
 
 const ENGLISH_LANGUAGE: &str = "en";
 const YODA_URL: &str = "https://api.funtranslations.com/translate/yoda.json";
@@ -133,7 +134,7 @@ impl PokemonService {
             self.description
         );
         let client = Client::new();
-        match client.get(url).send() {
+        match client.get(url).timeout(Duration::from_secs(10)).send() {
             Ok(res) => {
                 match res.status() {
                     //pokemon not found: returning the custom Error struct
@@ -175,10 +176,16 @@ impl PokemonService {
                     }
                 }
             }
-            //An error occurred trying to connect to the remote pokeapi.co server: return an Error object
+            /*
+            An error occurred trying to connect to the remote pokeapi.co server: return an Error object
+            Check if it is a timeout error (> 10 secs)
+             */
             Err(err) => {
                 error!("error occurred calling pokeapi.co : {}", err);
-                Err(PokeError::ServiceUnavailable)
+                match err.is_timeout() {
+                    true => Err(PokeError::TimeoutError),
+                    false => Err(PokeError::ServiceUnavailable),
+                }
             }
         }
     }
@@ -202,7 +209,7 @@ pub fn translate_pokemon(dto: &mut PokemonDto) {
         "query params used in the translation server call {:?}",
         &params
     );
-    match client.get(url).query(&[params]).send() {
+    match client.get(url).timeout(Duration::from_secs(10)).query(&[params]).send() {
         Ok(t) => {
             println!("{:?}", t);
             match t.status() {

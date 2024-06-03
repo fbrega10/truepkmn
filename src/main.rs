@@ -7,7 +7,6 @@ use crate::models::pokemon::{PokemonDto, PokemonService, PokemonType};
 use actix_web::web::Json;
 use actix_web::{get, middleware::Logger, web, App, HttpResponse, HttpServer, ResponseError};
 use tokio::task::JoinHandle;
-
 #[get("/api/v1/pokemon/{name}")]
 async fn get_pokemon(name: web::Path<String>) -> HttpResponse {
     let pk = PokemonService::new(name.to_lowercase().to_string(), PokemonType::BASIC);
@@ -39,7 +38,7 @@ async fn main() -> std::io::Result<()> {
             .service(get_translated_pokemon)
             .wrap(Logger::new("%a %{User-Agent}i"))
     })
-    .bind(("127.0.0.1", 8080))?
+    .bind(("0.0.0.0", 8080))?
     .run()
     .await
 }
