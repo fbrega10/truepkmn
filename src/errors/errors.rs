@@ -38,9 +38,7 @@ impl CustomError {
 impl From<PokeError> for CustomError {
     fn from(value: PokeError) -> Self {
         match value {
-            PokeError::ServiceUnavailable => {
-                CustomError::new(ERROR_CODE_01, SERVICE_UNAVAILABLE)
-            }
+            PokeError::ServiceUnavailable => CustomError::new(ERROR_CODE_01, SERVICE_UNAVAILABLE),
             PokeError::NotFound => CustomError::new(ERROR_CODE_02, POKEMON_NOT_FOUND),
             PokeError::TimeoutError => CustomError::new(ERROR_CODE_03, POKEMON_TIMEOUT),
         }
