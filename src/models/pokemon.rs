@@ -1,6 +1,6 @@
 use crate::errors::errors::PokeError;
 use actix_web::web::Json;
-use log::{debug, error, info, log_enabled, Level};
+use log::{error, info};
 use reqwest::{self, blocking::Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
@@ -120,13 +120,12 @@ impl PokemonService {
                 match res.status() {
                     StatusCode::NOT_FOUND => {
                         error!("{}", POKE_NOT_FOUND);
-                        return Err(PokeError::NotFound("pokemon not found".to_string()));
+                        return Err(PokeError::NotFound);
                     }
                     StatusCode::OK => (),
-                    _ => {
-                        return Err(PokeError::ServiceUnavailable(
-                            "unexpected error calling server pokeapi.co".to_string(),
-                        ))
+                    e => {
+                        error!("error occurred, status code : {}", e);
+                        return Err(PokeError::ServiceUnavailable)
                     }
                 }
                 let species = res
@@ -159,9 +158,7 @@ impl PokemonService {
             }
             Err(err) => {
                 error!("error occurred calling pokeapi.co : {}", err);
-                Err(PokeError::ServiceUnavailable(
-                    "pokeapi.co is currently unavailable ".to_string(),
-                ))
+                Err(PokeError::ServiceUnavailable)
             }
         }
     }

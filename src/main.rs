@@ -1,5 +1,6 @@
 mod errors;
 mod models;
+mod tests;
 
 use crate::errors::errors::PokeError;
 use crate::models::pokemon::{PokemonDto, PokemonService, PokemonType};
