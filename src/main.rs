@@ -10,7 +10,7 @@ use tokio::task::JoinHandle;
 
 #[get("/api/v1/pokemon/{name}")]
 async fn get_pokemon(name: web::Path<String>) -> HttpResponse {
-    let pk = PokemonService::new(name.to_uppercase().to_string(), PokemonType::BASIC);
+    let pk = PokemonService::new(name.to_lowercase().to_string(), PokemonType::BASIC);
     let handle: JoinHandle<Result<Json<PokemonDto>, PokeError>> =
         tokio::task::spawn_blocking(move || pk.catch_pokemon());
     match handle.await.unwrap() {
@@ -21,7 +21,7 @@ async fn get_pokemon(name: web::Path<String>) -> HttpResponse {
 
 #[get("/api/v1/pokemon/{name}/translated")]
 async fn get_translated_pokemon(name: web::Path<String>) -> HttpResponse {
-    let pk = PokemonService::new(name.to_uppercase().to_string(), PokemonType::TRANSLATED);
+    let pk = PokemonService::new(name.to_lowercase().to_string(), PokemonType::TRANSLATED);
     let handle: JoinHandle<Result<Json<PokemonDto>, PokeError>> =
         tokio::task::spawn_blocking(move || pk.catch_pokemon());
     match handle.await.unwrap() {
