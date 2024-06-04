@@ -40,3 +40,21 @@ If you want to run the app as a Docker container you should:
 ``` docker run -d --name truepkmn -p 8080:8080 truepkmn ```
 
 #### Now you're ready to go! Gotta catch 'em all!'
+
+
+### What would I'd do for a production API?
+
+Considering that the same pokemon could be called several times in different
+requests, caching could be an interesting idea to improve the overall throughput 
+of the service as it wouldn't require to call any external api's (pokeapi.co and funtranslations).
+
+As we're saying that for multiple requests (requiring the same resource) we could have some benefits,
+we should also consider that it introduces the problem of cache invalidation (when should I remove
+an element from my cache? How can I make this mechanism work?), which is not easy to solve.
+
+For a production backend API I would rather use gRPC over REST: the data exchange happens
+through Protobufs, which are lighter than JSON messages and they come for free as you
+compile using the protoc utility (for most of the languages).
+The only thing you need in this case is a .proto file defining your service and the objects you wish to use.
+Grpc is faster than REST and it offers real-time streaming, allowing clients and servers to send and receive messages
+bidirectionally.
