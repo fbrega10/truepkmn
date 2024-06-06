@@ -2,30 +2,25 @@ mod errors;
 mod models;
 mod tests;
 
-use crate::errors::errors::PokeError;
-use crate::models::pokemon::{PokemonDto, PokemonService, PokemonType};
-use actix_web::web::Json;
+use crate::models::pokemon::{PokemonService, PokemonType};
 use actix_web::{get, middleware::Logger, web, App, HttpResponse, HttpServer, ResponseError};
-use tokio::task::JoinHandle;
 #[get("/api/v1/pokemon/{name}")]
 async fn get_pokemon(name: web::Path<String>) -> HttpResponse {
     let pk = PokemonService::new(name.to_lowercase().to_string(), PokemonType::BASIC);
-    let handle: JoinHandle<Result<Json<PokemonDto>, PokeError>> =
-        tokio::task::spawn_blocking(move || pk.catch_pokemon());
-    match handle.await.unwrap() {
-        Ok(t) => HttpResponse::Ok().json(t),
-        Err(e) => e.error_response(),
+    let handle = tokio::join!(pk.catch_pokemon());
+    match handle {
+        (Ok(t),) => HttpResponse::Ok().json(t),
+        (Err(e),) => e.error_response(),
     }
 }
 
 #[get("/api/v1/pokemon/{name}/translated")]
 async fn get_translated_pokemon(name: web::Path<String>) -> HttpResponse {
     let pk = PokemonService::new(name.to_lowercase().to_string(), PokemonType::TRANSLATED);
-    let handle: JoinHandle<Result<Json<PokemonDto>, PokeError>> =
-        tokio::task::spawn_blocking(move || pk.catch_pokemon());
-    match handle.await.unwrap() {
-        Ok(t) => HttpResponse::Ok().json(t),
-        Err(e) => e.error_response(),
+    let handle = tokio::join!(pk.catch_pokemon());
+    match handle {
+        (Ok(t),) => HttpResponse::Ok().json(t),
+        (Err(e),) => e.error_response(),
     }
 }
 

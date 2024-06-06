@@ -1,7 +1,7 @@
 use crate::errors::errors::PokeError;
 use actix_web::web::Json;
 use log::{error, info};
-use reqwest::{self, blocking::Client, StatusCode};
+use reqwest::{self, Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::time::Duration;
@@ -123,7 +123,7 @@ impl PokemonService {
         }
     }
 
-    pub fn catch_pokemon(&self) -> Result<Json<PokemonDto>, PokeError> {
+    pub async fn catch_pokemon(&self) -> Result<Json<PokemonDto>, PokeError> {
         /*
         catch_pokemon is the main method of the truepkmn library:
         having a service with a description field it utilizes this string
@@ -134,7 +134,7 @@ impl PokemonService {
             self.description
         );
         let client = Client::new();
-        match client.get(url).timeout(Duration::from_secs(10)).send() {
+        match client.get(url).timeout(Duration::from_secs(10)).send().await {
             Ok(res) => {
                 match res.status() {
                     //pokemon not found: returning the custom Error struct
@@ -150,6 +150,7 @@ impl PokemonService {
                 }
                 let species = res
                     .json::<SpeciesResponse>()
+                    .await
                     .expect("error parsing the json Pokemon Species response");
                 let habitat: String = (&species.habitat.name)
                     .chars()
@@ -171,7 +172,7 @@ impl PokemonService {
                 match self.pokemon_type {
                     PokemonType::BASIC => Ok(Json(pokemon)),
                     PokemonType::TRANSLATED => {
-                        translate_pokemon(&mut pokemon);
+                        translate_pokemon(&mut pokemon).await;
                         Ok(Json(pokemon))
                     }
                 }
@@ -191,7 +192,7 @@ impl PokemonService {
     }
 }
 
-pub fn translate_pokemon(dto: &mut PokemonDto) {
+pub async fn translate_pokemon(dto: &mut PokemonDto) {
     //call to the funapitranslations server and get the formatted description
     //using a reference to modify (no copying in memory) the pokemonDto value
     info!("pokemon dto to be translated : {:?}", dto);
@@ -209,13 +210,14 @@ pub fn translate_pokemon(dto: &mut PokemonDto) {
         "query params used in the translation server call {:?}",
         &params
     );
-    match client.get(url).timeout(Duration::from_secs(10)).query(&[params]).send() {
+    match client.get(url).timeout(Duration::from_secs(10)).query(&[params]).send().await {
         Ok(t) => {
             println!("{:?}", t);
             match t.status() {
                 StatusCode::OK => {
                     let response = t
                         .json::<Translation>()
+                        .await
                         .expect("error parsing the json response from shakespeare")
                         .contents
                         .translated;
